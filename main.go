@@ -1,17 +1,60 @@
+// Recipes API
+//
+// This is a sample recipes API. You can find out more about
+//	the API at https://github.com/PacktPublishing/BuildingDistributed-Applications-in-Gin.
+//
+// Schemes: http
+// Host: localhost:8080
+// BasePath: /
+// Version: 1.0.0
+// Contact: Kai
+// <mohamed@labouardy.com> https://labouardy.com
+//
+// Consumes:
+// - application/json
+//
+// Produces:
+// - application/json
+// swagger:meta
 package main
 
-import "github.com/gin-gonic/gin"
+import (
+	"context"
+	"database/sql"
+	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
+	_ "github.com/lib/pq"
+	"log"
+	"recipes-api/database"
+	"recipes-api/handlers"
+)
 
-type Recipe struct {
-    Name string `json:"name"`
-    Tags []string `json:"tags"`
-    Ingredients []string `json:"ingredients"`
-    Instructions []string `json:"instructions"`
-    PublishedAt time.Time `json:"publishedAt"`
+var recipesHandler *handlers.RecipesHandler
+var redisClient *redis.Client
+var db *sql.DB
+var err error
+var ctx context.Context
+
+func init() {
+	ctx = context.Background()
+	db, err = database.NewDB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	redisClient = redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: "", DB: 0})
+	recipesHandler = handlers.NewRecipesHandler(db, ctx, redisClient)
 }
 
 func main() {
-    router := gin.Default();
+	router := gin.Default()
+	router.POST("/recipes", recipesHandler.NewRecipeHandler)
+	router.PUT("/recipe/:id", recipesHandler.UpdateRecipeHandler)
+	router.DELETE("recipe/:id", recipesHandler.DeleteRecipeHandler)
+	router.GET("/recipes/search", recipesHandler.SearchRecipesHandler)
+	router.GET("/recipes", recipesHandler.ListRecipeHandler)
 
-    router.Run()
+	err := router.Run()
+	if err != nil {
+		return
+	}
 }
